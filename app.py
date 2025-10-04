@@ -2,20 +2,6 @@
 import streamlit as st
 
 st.set_page_config(page_title="Cattle Methane Reduction Tool", page_icon="🐄", layout="centered")
-
-# Force light mode
-st.markdown(
-    """
-    <style>
-    body, .stApp {
-        background-color: #ffffff !important;
-        color: #0f172a !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 # -----------------------------
 # Defaults
 # -----------------------------
