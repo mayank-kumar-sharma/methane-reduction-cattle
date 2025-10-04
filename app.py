@@ -2,6 +2,7 @@
 import streamlit as st
 
 st.set_page_config(page_title="Cattle Methane Reduction Tool", page_icon="🐄", layout="centered")
+
 # -----------------------------
 # Defaults
 # -----------------------------
@@ -55,56 +56,62 @@ def compute_what_if(n, cattle_type, diet):
 # -----------------------------
 st.markdown(
     """
-    <div style='background-color:#f0fdf4; padding:15px; border-radius:10px; text-align:center'>
+    <div style='background-color:#f0fdf4; padding:20px; border-radius:12px; text-align:center'>
         <h1 style='color:#166534;'>🐄 Cattle Methane Reduction Tool</h1>
-        <p style='color:#374151; font-size:18px;'>
+        <p style='color:#374151; font-size:17px;'>
             Estimate methane emissions and reductions from cattle herds.<br>
-            Includes <b>CO₂e, cars 🚗, and trees 🌳 equivalents</b>.
+            Includes <b>CO₂e 🌍, cars 🚗, and trees 🌳 equivalents</b>.
         </p>
     </div>
     """,
     unsafe_allow_html=True
 )
 
-with st.form("inputs"):
-    n = st.number_input("Number of cattle", min_value=1, value=100)
-    cattle_type = st.selectbox("Type of cattle", ["dairy", "beef", "buffalo"])
-    diet = st.selectbox("Diet type", ["conventional", "improved", "high-quality"])
-    additive = st.selectbox("Additive used", ["none", "seaweed", "3-NOP", "oils"])
-    submitted = st.form_submit_button("Calculate")
+st.markdown("### 📥 Enter Herd Details")
+
+with st.container():
+    with st.form("inputs"):
+        n = st.number_input("Number of cattle", min_value=1, value=100)
+        cattle_type = st.selectbox("Type of cattle", ["dairy", "beef", "buffalo"])
+        diet = st.selectbox("Diet type", ["conventional", "improved", "high-quality"])
+        additive = st.selectbox("Additive used", ["none", "seaweed", "3-NOP", "oils"])
+        submitted = st.form_submit_button("🚀 Calculate")
 
 if submitted:
     res = compute_results(n, cattle_type, diet, additive)
 
     if additive != "none":
         st.subheader("✅ Results with Additive")
-        st.write(f"**Baseline methane:** {fmt(res['baseline_tCH4'])} t CH₄/year "
-                 f"(= {fmt(res['baseline_tCO2e'])} t CO₂e/year)")
-        st.write(f"**Methane reduced:** {fmt(res['reduced_tCH4'])} t CH₄/year")
-        st.write(f"🌍 **CO₂e avoided:** {fmt(res['avoided_tCO2e'])} t/year")
-        st.write(f"🚗 **Cars removed:** {fmt(res['cars'])} per year")
-        st.write(f"🌳 **Tree equivalent:** {fmt(res['trees'])} trees")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Baseline CH₄ (t/yr)", fmt(res['baseline_tCH4']))
+            st.metric("Methane Reduced (t/yr)", fmt(res['reduced_tCH4']))
+        with col2:
+            st.metric("CO₂e Avoided (t/yr) 🌍", fmt(res['avoided_tCO2e']))
+            st.metric("Cars Removed 🚗", fmt(res['cars']))
+
+        st.metric("Tree Equivalent 🌳", fmt(res['trees']))
 
     else:
         st.subheader("📊 Baseline Emissions (no additive)")
-        st.write(f"**{fmt(res['baseline_tCH4'])} t CH₄/year** "
-                 f"(= {fmt(res['baseline_tCO2e'])} t CO₂e/year)")
+        st.metric("Baseline CH₄ (t/yr)", fmt(res['baseline_tCH4']))
+        st.metric("Baseline CO₂e (t/yr)", fmt(res['baseline_tCO2e']))
 
         # What-if section
         st.subheader("🌿 What-if Savings (if you adopt an additive)")
         for row in compute_what_if(n, cattle_type, diet):
-            st.markdown(f"### ➡️ {row['additive']}")
-            st.write(f"Reduction: **{int(row['f_total']*100)}%**")
-            st.write(f"🌍 CO₂e avoided: **{fmt(row['tCO2e'])} t/year**")
-            st.write(f"🚗 Cars removed: **{fmt(row['cars'])}** per year")
-            st.write(f"🌳 Tree equivalent: **{fmt(row['trees'])}** trees")
+            with st.expander(f"➡️ {row['additive']}"):
+                st.write(f"Reduction: **{int(row['f_total']*100)}%**")
+                st.write(f"🌍 CO₂e avoided: **{fmt(row['tCO2e'])} t/year**")
+                st.write(f"🚗 Cars removed: **{fmt(row['cars'])}** per year")
+                st.write(f"🌳 Tree equivalent: **{fmt(row['trees'])}** trees")
 
-st.markdown("---")
-
-# Footer
 st.markdown("---")
 st.markdown("💡 Made with ❤️ by **Mayank Kumar Sharma**")
-st.markdown("**Assumptions:** Dairy 72, Beef 60, Buffalo 90 kg CH₄/head·yr. "
-            "Diet reduction: 0–15%. Additives: Seaweed 30%, 3-NOP 31%, Oils 10%. "
-            "Conversions: 1 kg CH₄ = 28 kg CO₂e; 1 car = 4.6 t CO₂e/year; "
-            "1 tree = 0.021 t CO₂e/year.")
+st.markdown(
+    "**Assumptions:** Dairy 72, Beef 60, Buffalo 90 kg CH₄/head·yr. "
+    "Diet reduction: 0–15%. Additives: Seaweed 30%, 3-NOP 31%, Oils 10%. "
+    "Conversions: 1 kg CH₄ = 28 kg CO₂e; 1 car = 4.6 t CO₂e/year; "
+    "1 tree = 0.021 t CO₂e/year."
+)
