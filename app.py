@@ -1,8 +1,30 @@
 # app.py
 # Cattle Methane Reduction Tool — Streamlit UI (simple version)
-# No CSS, only Streamlit native layout + emojis
+# Force light theme with inline CSS
 
 import streamlit as st
+
+# -----------------------------
+# Page Config + Force Light Theme
+# -----------------------------
+st.set_page_config(
+    page_title="Cattle Methane Reduction Tool",
+    page_icon="🐄",
+    layout="centered"
+)
+
+# Force light theme background and text
+st.markdown(
+    """
+    <style>
+    body, .stApp {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # -----------------------------
 # Config / Defaults
