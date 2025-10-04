@@ -90,6 +90,10 @@ if submitted:
             st.write(f"🌳 Tree equivalent: **{fmt(row['trees'])}** trees")
 
 st.markdown("---")
+
+# Footer
+st.markdown("---")
+st.markdown("💡 Made with ❤️ by **Mayank Kumar Sharma**")
 st.markdown("**Assumptions:** Dairy 72, Beef 60, Buffalo 90 kg CH₄/head·yr. "
             "Diet reduction: 0–15%. Additives: Seaweed 30%, 3-NOP 31%, Oils 10%. "
             "Conversions: 1 kg CH₄ = 28 kg CO₂e; 1 car = 4.6 t CO₂e/year; "
