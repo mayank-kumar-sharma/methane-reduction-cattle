@@ -53,8 +53,18 @@ def compute_what_if(n, cattle_type, diet):
 # -----------------------------
 # UI
 # -----------------------------
-st.title("🐄 Cattle Methane Reduction Tool")
-st.caption("Estimate methane emissions and reductions from cattle herds. Results in tonnes per year (t/yr).")
+st.markdown(
+    """
+    <div style='background-color:#f0fdf4; padding:15px; border-radius:10px; text-align:center'>
+        <h1 style='color:#166534;'>🐄 Cattle Methane Reduction Tool</h1>
+        <p style='color:#374151; font-size:18px;'>
+            Estimate methane emissions and reductions from cattle herds.<br>
+            Includes <b>CO₂e, cars 🚗, and trees 🌳 equivalents</b>.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 with st.form("inputs"):
     n = st.number_input("Number of cattle", min_value=1, value=100)
