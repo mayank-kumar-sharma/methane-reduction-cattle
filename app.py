@@ -74,6 +74,11 @@ with st.container():
         n = st.number_input("Number of cattle", min_value=1, value=100)
         cattle_type = st.selectbox("Type of cattle", ["dairy", "beef", "buffalo"])
         diet = st.selectbox("Diet type", ["conventional", "improved", "high-quality"])
+        st.caption("""
+        **Conventional =** Mostly dry fodder / crop residue / low nutrition  
+        **Improved =** Mix of dry + green fodder, better feed balance  
+        **High-quality =** Good nutrition with protein-rich feed / concentrates
+        """)
         additive = st.selectbox("Additive used", ["none", "seaweed", "3-NOP", "oils"])
         submitted = st.form_submit_button("🚀 Calculate")
 
