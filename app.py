@@ -4,7 +4,7 @@ import streamlit as st
 st.set_page_config(page_title="Cattle Methane Reduction Tool", page_icon="🐄", layout="centered")
 
 # -----------------------------
-# Defaults (base values)
+# Defaults (permanently conservative & India-ready)
 # -----------------------------
 # Renamed "dairy" -> "cow"
 EMISSION_FACTORS_KG_PER_HEAD_YR = {
@@ -13,25 +13,26 @@ EMISSION_FACTORS_KG_PER_HEAD_YR = {
     "buffalo": 90.0,  # kg CH4/head·year
 }
 
+# Diet reduction (more conservative)
 DIET_REDUCTION = {
     "conventional": 0.00,
-    "improved": 0.10,
-    "high-quality": 0.15,
+    "improved": 0.08,       # was 0.10
+    "high-quality": 0.12,   # was 0.15
 }
 
-# Added Harit Dhara (ICAR)
+# Additive reduction (more conservative + India-specific Harit Dhara)
 ADDITIVE_REDUCTION = {
     "none": 0.00,
-    "harit dhara (icar)": 0.20,   # India-specific additive (conservative ~20%)
-    "seaweed": 0.30,
-    "3-NOP": 0.31,
-    "oils": 0.10,
+    "harit dhara (icar)": 0.18,  # was 0.20
+    "seaweed": 0.25,             # was 0.30
+    "3-NOP": 0.30,               # was 0.31
+    "oils": 0.08,                # was 0.10
 }
 
-# GWP options (CH4 -> CO2e)
+# GWP options (CH4 -> CO2e); AR6 as DEFAULT
 GWP_OPTIONS = {
-    "IPCC AR5 (28) — Best for India": 28.0,
-    "IPCC AR6 (27.2) — Latest": 27.2,
+    "IPCC AR6 (27.2) — Latest Update": 27.2,         # DEFAULT
+    "IPCC AR5 (28) — Mostly used in India": 28.0,
 }
 
 TREE_T_CO2E_PER_YEAR = 0.021
@@ -40,13 +41,13 @@ CAR_T_CO2E_PER_YEAR = 4.6
 # -----------------------------
 # Tier-2 style dynamic EF helpers (if weight provided)
 # -----------------------------
-# Base DMI%: dry matter intake as % of body weight (per day)
+# DMI%: dry matter intake as % of body weight (per day) — more conservative
 DMI_PCT_BY_DIET = {
-    "conventional": 0.020,   # 2.0% BW/day
-    "improved": 0.023,       # 2.3% BW/day
-    "high-quality": 0.026,   # 2.6% BW/day
+    "conventional": 0.019,   # was 0.020
+    "improved": 0.022,       # was 0.023
+    "high-quality": 0.025,   # was 0.026
 }
-# Ym: % of gross energy lost as CH4
+# Ym: % of gross energy lost as CH4 (kept realistic & stable)
 YM_BY_DIET = {
     "conventional": 7.0,     # %
     "improved": 6.5,         # %
@@ -78,7 +79,7 @@ def calc_dynamic_ef_kg_per_head_yr(weight_kg: float, diet: str) -> float:
     """
     if weight_kg is None or weight_kg <= 0:
         return 0.0
-    dmi_pct = DMI_PCT_BY_DIET.get(diet, 0.02)
+    dmi_pct = DMI_PCT_BY_DIET.get(diet, 0.019)
     ym = YM_BY_DIET.get(diet, 7.0)
     dmi_kg_day = weight_kg * dmi_pct
     ge_mj_day = dmi_kg_day * GE_DENSITY_MJ_PER_KG_DM
@@ -149,7 +150,7 @@ def compute_what_if(n, cattle_type, diet, gwp, ef_override_kg_per_head_yr=None):
     return rows
 
 # -----------------------------
-# Header
+# UI
 # -----------------------------
 st.markdown(
     """
@@ -166,40 +167,6 @@ st.markdown(
 
 st.markdown("### 📥 Enter Herd Details")
 
-# -----------------------------
-# "Latest scientific estimates" toggle (no 'conservative' wording)
-# -----------------------------
-use_latest = st.checkbox("Use latest scientific estimates (more realistic)", value=False)
-
-# Build active parameter sets depending on toggle
-if use_latest:
-    # Lower reductions (diet & additives)
-    DIET_REDUCTION.update({
-        "conventional": 0.00,
-        "improved": 0.08,      # was 0.10
-        "high-quality": 0.12,  # was 0.15
-    })
-    ADDITIVE_REDUCTION.update({
-        "none": 0.00,
-        "harit dhara (icar)": 0.18,  # was 0.20
-        "seaweed": 0.25,              # was 0.30
-        "3-NOP": 0.30,                # was 0.31
-        "oils": 0.08,                 # was 0.10
-    })
-    # Slightly lower intake assumptions
-    DMI_PCT_BY_DIET.update({
-        "conventional": 0.019,   # was 0.020
-        "improved": 0.022,       # was 0.023
-        "high-quality": 0.025,   # was 0.026
-    })
-    # Default GWP index points to AR6 when 'latest' is checked
-    default_gwp_index = 1  # "IPCC AR6 (27.2) — Latest"
-else:
-    default_gwp_index = 0  # "IPCC AR5 (28) — Best for India"
-
-# -----------------------------
-# Form
-# -----------------------------
 with st.container():
     with st.form("inputs"):
         n = st.number_input("Number of animals", min_value=1, value=100)
@@ -219,15 +186,12 @@ with st.container():
         # Additives with Harit Dhara
         additive = st.selectbox("Additive used", ["none", "harit dhara (icar)", "seaweed", "3-NOP", "oils"])
 
-        # GWP selector (default depends on toggle)
-        gwp_label = st.selectbox("GWP method (CH₄ → CO₂e)", list(GWP_OPTIONS.keys()), index=default_gwp_index)
+        # GWP selector (AR6 default)
+        gwp_label = st.selectbox("GWP method (CH₄ → CO₂e)", list(GWP_OPTIONS.keys()), index=0)
         gwp_value = GWP_OPTIONS[gwp_label]
 
         submitted = st.form_submit_button("🚀 Calculate")
 
-# -----------------------------
-# Results
-# -----------------------------
 if submitted:
     # Parse weight if provided
     weight_val = None
@@ -295,12 +259,12 @@ st.markdown(
 | **EF – Cow** | 72 kg CH₄/head·yr | Conservative mid-range from IPCC/ICAR/FAO references |
 | **EF – Beef** | 60 kg CH₄/head·yr | Within IPCC default bands for other cattle |
 | **EF – Buffalo** | 90 kg CH₄/head·yr | Buffalo typically higher than cattle (India studies) |
-| **Diet reduction** | 10–15% (8–12% when 'latest' is on) | Feed quality improvements yield ~5–20%; we use conservative values |
-| **Harit Dhara (ICAR)** | 20% (18% when 'latest' is on) | India-specific additive; ICAR reports ~17–20% reduction |
-| **Seaweed** | 30% (25% when 'latest' is on) | Field-realistic average from global trials (Australia/US) |
-| **3-NOP** | 31% (30% when 'latest' is on) | Meta-analyses across trials; 30–40% typical |
-| **Oils** | 10% (8% when 'latest' is on) | Fat supplementation commonly ~8–15% |
-| **CH₄ → CO₂e (GWP)** | AR5=28 (Best for India), AR6=27.2 (Latest) | India commonly uses IPCC guidelines; AR6 reflects newer science |
+| **Diet reduction** | 0% / 8% / 12% | Feed quality improvements yield ~5–20%; we use conservative values |
+| **Harit Dhara (ICAR)** | 18% reduction | India-specific additive; ICAR reports ~17–20% reduction (we use 18%) |
+| **Seaweed** | 25% reduction | Field-realistic average from global trials (Australia/US) |
+| **3-NOP** | 30% reduction | Meta-analyses across trials; 30–40% typical |
+| **Oils** | 8% reduction | Fat supplementation commonly ~8–15%; conservative 8% |
+| **CH₄ → CO₂e (GWP)** | AR6=27.2 (Latest Update), AR5=28 (Mostly used in India) | India commonly follows IPCC; AR6 reflects newer science |
 | **Cars** | 4.6 t CO₂e/car·yr | US EPA |
 | **Trees** | 0.021 t CO₂e/tree·yr | Global forestry average (FAO/UNEP band) |
 """
