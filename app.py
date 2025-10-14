@@ -4,7 +4,7 @@ import streamlit as st
 st.set_page_config(page_title="Cattle Methane Reduction Tool", page_icon="🐄", layout="centered")
 
 # -----------------------------
-# Defaults
+# Defaults (base values)
 # -----------------------------
 # Renamed "dairy" -> "cow"
 EMISSION_FACTORS_KG_PER_HEAD_YR = {
@@ -31,7 +31,7 @@ ADDITIVE_REDUCTION = {
 # GWP options (CH4 -> CO2e)
 GWP_OPTIONS = {
     "IPCC AR5 (28) — Best for India": 28.0,
-    "IPCC AR6 (27.2)": 27.2,
+    "IPCC AR6 (27.2) — Latest": 27.2,
 }
 
 TREE_T_CO2E_PER_YEAR = 0.021
@@ -40,8 +40,7 @@ CAR_T_CO2E_PER_YEAR = 4.6
 # -----------------------------
 # Tier-2 style dynamic EF helpers (if weight provided)
 # -----------------------------
-# Simple, farmer-friendly defaults per diet:
-# DMI%: dry matter intake as % of body weight (per day)
+# Base DMI%: dry matter intake as % of body weight (per day)
 DMI_PCT_BY_DIET = {
     "conventional": 0.020,   # 2.0% BW/day
     "improved": 0.023,       # 2.3% BW/day
@@ -56,6 +55,9 @@ YM_BY_DIET = {
 GE_DENSITY_MJ_PER_KG_DM = 18.45   # MJ/kg DM
 CH4_ENERGY_MJ_PER_KG = 55.65      # MJ per kg CH4
 
+# -----------------------------
+# Functions
+# -----------------------------
 def fmt(x, ndigits=2):
     return f"{x:,.{ndigits}f}"
 
@@ -74,7 +76,7 @@ def calc_dynamic_ef_kg_per_head_yr(weight_kg: float, diet: str) -> float:
       4) kg CH4/day = CH4 energy / 55.65
       5) EF (kg/yr) = kg/day * 365
     """
-    if weight_kg <= 0:
+    if weight_kg is None or weight_kg <= 0:
         return 0.0
     dmi_pct = DMI_PCT_BY_DIET.get(diet, 0.02)
     ym = YM_BY_DIET.get(diet, 7.0)
@@ -147,7 +149,7 @@ def compute_what_if(n, cattle_type, diet, gwp, ef_override_kg_per_head_yr=None):
     return rows
 
 # -----------------------------
-# UI
+# Header
 # -----------------------------
 st.markdown(
     """
@@ -164,12 +166,46 @@ st.markdown(
 
 st.markdown("### 📥 Enter Herd Details")
 
+# -----------------------------
+# "Latest scientific estimates" toggle (no 'conservative' wording)
+# -----------------------------
+use_latest = st.checkbox("Use latest scientific estimates (more realistic)", value=False)
+
+# Build active parameter sets depending on toggle
+if use_latest:
+    # Lower reductions (diet & additives)
+    DIET_REDUCTION.update({
+        "conventional": 0.00,
+        "improved": 0.08,      # was 0.10
+        "high-quality": 0.12,  # was 0.15
+    })
+    ADDITIVE_REDUCTION.update({
+        "none": 0.00,
+        "harit dhara (icar)": 0.18,  # was 0.20
+        "seaweed": 0.25,              # was 0.30
+        "3-NOP": 0.30,                # was 0.31
+        "oils": 0.08,                 # was 0.10
+    })
+    # Slightly lower intake assumptions
+    DMI_PCT_BY_DIET.update({
+        "conventional": 0.019,   # was 0.020
+        "improved": 0.022,       # was 0.023
+        "high-quality": 0.025,   # was 0.026
+    })
+    # Default GWP index points to AR6 when 'latest' is checked
+    default_gwp_index = 1  # "IPCC AR6 (27.2) — Latest"
+else:
+    default_gwp_index = 0  # "IPCC AR5 (28) — Best for India"
+
+# -----------------------------
+# Form
+# -----------------------------
 with st.container():
     with st.form("inputs"):
         n = st.number_input("Number of animals", min_value=1, value=100)
         cattle_type = st.selectbox("Type of animal", ["cow", "beef", "buffalo"])
 
-        # Diet + simple explanation (kept from your version)
+        # Diet + simple explanation
         diet = st.selectbox("Diet type", ["conventional", "improved", "high-quality"])
         st.caption("""
 **Conventional =** Mostly dry fodder / crop residue / low nutrition  
@@ -179,15 +215,19 @@ with st.container():
 
         # Optional weight input (string to allow blank)
         weight_text = st.text_input("Average animal weight (kg) — Optional, improves accuracy", placeholder="e.g., 400")
+
         # Additives with Harit Dhara
         additive = st.selectbox("Additive used", ["none", "harit dhara (icar)", "seaweed", "3-NOP", "oils"])
 
-        # GWP selector
-        gwp_label = st.selectbox("GWP method (CH₄ → CO₂e)", list(GWP_OPTIONS.keys()), index=0)
+        # GWP selector (default depends on toggle)
+        gwp_label = st.selectbox("GWP method (CH₄ → CO₂e)", list(GWP_OPTIONS.keys()), index=default_gwp_index)
         gwp_value = GWP_OPTIONS[gwp_label]
 
         submitted = st.form_submit_button("🚀 Calculate")
 
+# -----------------------------
+# Results
+# -----------------------------
 if submitted:
     # Parse weight if provided
     weight_val = None
@@ -255,12 +295,12 @@ st.markdown(
 | **EF – Cow** | 72 kg CH₄/head·yr | Conservative mid-range from IPCC/ICAR/FAO references |
 | **EF – Beef** | 60 kg CH₄/head·yr | Within IPCC default bands for other cattle |
 | **EF – Buffalo** | 90 kg CH₄/head·yr | Buffalo typically higher than cattle (India studies) |
-| **Diet reduction** | 10–15% | Feed quality improvements yield ~5–20%; we use conservative values |
-| **Harit Dhara (ICAR)** | 20% reduction | India-specific additive; ICAR reports ~17–20% reduction (conservative 20%) |
-| **Seaweed** | 30% reduction | Field-realistic average from global trials (Australia/US) |
-| **3-NOP** | 31% reduction | Meta-analyses across trials; 30–40% typical |
-| **Oils** | 10% reduction | Fat supplementation commonly ~8–15%; conservative 10% |
-| **CH₄ → CO₂e (GWP)** | AR5=28 (default), AR6=27.2 | India commonly uses IPCC guidelines; AR5 widely adopted; AR6 available |
+| **Diet reduction** | 10–15% (8–12% when 'latest' is on) | Feed quality improvements yield ~5–20%; we use conservative values |
+| **Harit Dhara (ICAR)** | 20% (18% when 'latest' is on) | India-specific additive; ICAR reports ~17–20% reduction |
+| **Seaweed** | 30% (25% when 'latest' is on) | Field-realistic average from global trials (Australia/US) |
+| **3-NOP** | 31% (30% when 'latest' is on) | Meta-analyses across trials; 30–40% typical |
+| **Oils** | 10% (8% when 'latest' is on) | Fat supplementation commonly ~8–15% |
+| **CH₄ → CO₂e (GWP)** | AR5=28 (Best for India), AR6=27.2 (Latest) | India commonly uses IPCC guidelines; AR6 reflects newer science |
 | **Cars** | 4.6 t CO₂e/car·yr | US EPA |
 | **Trees** | 0.021 t CO₂e/tree·yr | Global forestry average (FAO/UNEP band) |
 """
@@ -269,5 +309,5 @@ st.markdown(
 st.markdown(
     "**Note:** If weight is provided, EF is computed from weight and diet using a Tier-2 style approach "
     "(DMI% by diet, GE=18.45 MJ/kg DM, Ym by diet, CH₄ energy=55.65 MJ/kg). "
-    "If weight is not provided, tool uses conservative default EF values."
+    "If weight is not provided, the tool uses conservative default EF values."
 )
