@@ -9,7 +9,6 @@ st.set_page_config(page_title="Cattle Methane Reduction Tool", page_icon="🐄",
 # Renamed "dairy" -> "cow"
 EMISSION_FACTORS_KG_PER_HEAD_YR = {
     "cow": 72.0,      # kg CH4/head·year (conservative default)
-    "beef": 60.0,     # kg CH4/head·year
     "buffalo": 90.0,  # kg CH4/head·year
 }
 
@@ -29,11 +28,8 @@ ADDITIVE_REDUCTION = {
     "oils": 0.08,                # was 0.10
 }
 
-# GWP options (CH4 -> CO2e); AR6 as DEFAULT
-GWP_OPTIONS = {
-    "IPCC AR6 (27.2) — Latest Update": 27.2,         # DEFAULT
-    "IPCC AR5 (28) — Mostly used in India": 28.0,
-}
+# FIXED GWP (CH4 -> CO2e); AR6 only
+GWP_VALUE = 27.2  # IPCC AR6 (27.2) — Latest Update (Best for India)
 
 TREE_T_CO2E_PER_YEAR = 0.021
 CAR_T_CO2E_PER_YEAR = 4.6
@@ -88,7 +84,7 @@ def calc_dynamic_ef_kg_per_head_yr(weight_kg: float, diet: str) -> float:
     ef_kg_yr = kg_ch4_day * 365.0
     return ef_kg_yr
 
-def compute_results(n, cattle_type, diet, additive, gwp, ef_override_kg_per_head_yr=None):
+def compute_results(n, cattle_type, diet, additive, ef_override_kg_per_head_yr=None):
     # choose EF: use dynamic if provided, else defaults
     if ef_override_kg_per_head_yr and ef_override_kg_per_head_yr > 0:
         ef = ef_override_kg_per_head_yr
@@ -100,12 +96,12 @@ def compute_results(n, cattle_type, diet, additive, gwp, ef_override_kg_per_head
     base_tCH4 = baseline_tCH4(ef, n)
     f_total = combined_reduction_fraction(f_diet, f_add)
     reduced_tCH4 = base_tCH4 * f_total
-    avoided_tCO2e = reduced_tCH4 * gwp
+    avoided_tCO2e = reduced_tCH4 * GWP_VALUE
 
     cars = avoided_tCO2e / CAR_T_CO2E_PER_YEAR
     trees = avoided_tCO2e / TREE_T_CO2E_PER_YEAR
 
-    base_tCO2e = base_tCH4 * gwp
+    base_tCO2e = base_tCH4 * GWP_VALUE
 
     return dict(
         ef_used=ef,
@@ -118,10 +114,10 @@ def compute_results(n, cattle_type, diet, additive, gwp, ef_override_kg_per_head
         avoided_tCO2e=avoided_tCO2e,
         cars=cars,
         trees=trees,
-        gwp=gwp,
+        gwp=GWP_VALUE,
     )
 
-def compute_what_if(n, cattle_type, diet, gwp, ef_override_kg_per_head_yr=None):
+def compute_what_if(n, cattle_type, diet, ef_override_kg_per_head_yr=None):
     if ef_override_kg_per_head_yr and ef_override_kg_per_head_yr > 0:
         ef = ef_override_kg_per_head_yr
     else:
@@ -136,7 +132,7 @@ def compute_what_if(n, cattle_type, diet, gwp, ef_override_kg_per_head_yr=None):
             continue
         f_total = combined_reduction_fraction(f_diet, f_add)
         tCH4_red = base_tCH4 * f_total
-        tCO2e = tCH4_red * gwp
+        tCO2e = tCH4_red * GWP_VALUE
         rows.append(
             dict(
                 additive=add_name,
@@ -170,7 +166,7 @@ st.markdown("### 📥 Enter Herd Details")
 with st.container():
     with st.form("inputs"):
         n = st.number_input("Number of animals", min_value=1, value=100)
-        cattle_type = st.selectbox("Type of animal", ["cow", "beef", "buffalo"])
+        cattle_type = st.selectbox("Type of animal", ["cow", "buffalo"])
 
         # Diet + simple explanation
         diet = st.selectbox("Diet type", ["conventional", "improved", "high-quality"])
@@ -185,10 +181,6 @@ with st.container():
 
         # Additives with Harit Dhara
         additive = st.selectbox("Additive used", ["none", "harit dhara (icar)", "seaweed", "3-NOP", "oils"])
-
-        # GWP selector (AR6 default)
-        gwp_label = st.selectbox("GWP method (CH₄ → CO₂e)", list(GWP_OPTIONS.keys()), index=0)
-        gwp_value = GWP_OPTIONS[gwp_label]
 
         submitted = st.form_submit_button("🚀 Calculate")
 
@@ -210,7 +202,7 @@ if submitted:
     st.info("Results will be more accurate if average animal weight is provided." if not weight_val else
             f"Using weight-based emission factor from {int(weight_val)} kg (Tier-2 style).")
 
-    res = compute_results(n, cattle_type, diet, additive, gwp_value, ef_override_kg_per_head_yr=ef_dynamic)
+    res = compute_results(n, cattle_type, diet, additive, ef_override_kg_per_head_yr=ef_dynamic)
 
     if additive != "none":
         st.subheader("✅ Results with Additive")
@@ -238,7 +230,7 @@ if submitted:
 
         # What-if section
         st.subheader("🌿 What-if Savings (if you adopt an additive)")
-        for row in compute_what_if(n, cattle_type, diet, gwp_value, ef_override_kg_per_head_yr=ef_dynamic):
+        for row in compute_what_if(n, cattle_type, diet, ef_override_kg_per_head_yr=ef_dynamic):
             with st.expander(f"➡️ {row['additive']}"):
                 st.write(f"Reduction: **{int(row['f_total']*100)}%**")
                 st.write(f"🌍 CO₂e avoided: **{fmt(row['tCO2e'])} t/year**")
@@ -249,24 +241,23 @@ st.markdown("---")
 st.markdown("💡 Made with ❤️ by **Mayank Kumar Sharma**")
 
 # -----------------------------
-# Sources & Assumptions (simple table)
+# Sources & Assumptions
 # -----------------------------
 st.markdown("### 📚 Sources & Assumptions")
 st.markdown(
 """
-| Parameter | Default Used | Notes / Source |
+| Parameter | Value Used | Notes / Source |
 |---|---:|---|
-| **EF – Cow** | 72 kg CH₄/head·yr | Conservative mid-range from IPCC/ICAR/FAO references |
-| **EF – Beef** | 60 kg CH₄/head·yr | Within IPCC default bands for other cattle |
-| **EF – Buffalo** | 90 kg CH₄/head·yr | Buffalo typically higher than cattle (India studies) |
-| **Diet reduction** | 0% / 8% / 12% | Feed quality improvements yield ~5–20%; we use conservative values |
-| **Harit Dhara (ICAR)** | 18% reduction | India-specific additive; ICAR reports ~17–20% reduction (we use 18%) |
-| **Seaweed** | 25% reduction | Field-realistic average from global trials (Australia/US) |
-| **3-NOP** | 30% reduction | Meta-analyses across trials; 30–40% typical |
-| **Oils** | 8% reduction | Fat supplementation commonly ~8–15%; conservative 8% |
-| **CH₄ → CO₂e (GWP)** | AR6=27.2 (Latest Update), AR5=28 (Mostly used in India) | India commonly follows IPCC; AR6 reflects newer science |
+| **EF – Cow** | 72 kg CH₄/head·yr | Conservative mid-range from IPCC/ICAR/FAO |
+| **EF – Buffalo** | 90 kg CH₄/head·yr | Buffalo emits more (India research) |
+| **Diet reduction** | 0% / 8% / 12% | Conservative values (real-world achievable) |
+| **Harit Dhara (ICAR)** | 18% reduction | ICAR studies show ~17–20% |
+| **Seaweed** | 25% reduction | Average from multiple trials |
+| **3-NOP** | 30% reduction | Proven in global studies |
+| **Oils** | 8% reduction | Typical range 8–15% |
+| **CH₄ → CO₂e (GWP)** | **27.2 (IPCC AR6 — Latest Update)** | Most up-to-date science |
 | **Cars** | 4.6 t CO₂e/car·yr | US EPA |
-| **Trees** | 0.021 t CO₂e/tree·yr | Global forestry average (FAO/UNEP band) |
+| **Trees** | 0.021 t CO₂e/tree·yr | FAO/UNEP global avg |
 """
 )
 
